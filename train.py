@@ -11,10 +11,6 @@ import model
 
 def get_ctx():
     ctx = mxnet.gpu()
-    try:
-        ndarray.array([0], ctx)
-    except:
-        ctx = mxnet.cpu()
     return ctx
 
 
@@ -23,8 +19,13 @@ def _get_batch(batch, ctx):
 
     if isinstance(ctx, mxnet.Context):
         ctx = [ctx]
-    features, labels = batch
-#    features = [data + (1024 * 1024 - len(data)) * [0] for data in features]
+    features = []
+    labels = []
+    for feature, label in zip(batch[0],batch[1]):
+        f = load.load(feature)
+        if f:
+            features.append(f)
+            labels.append(label)
 
     return (gutils.split_and_load(features, ctx),
 
@@ -137,5 +138,6 @@ scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
 trainer = gluon.Trainer(net.collect_params(), 'sgd',
                         {'learning_rate': 0.01, 'wd': 2e-4, 'lr_scheduler': scheduler, 'momentum': 0.9})
 train_data, test_data = load.loadpath()
-batch_size = 30
+print(len(train_data),len(test_data))
+batch_size = 12
 train(train_data, test_data, batch_size, net, loss, trainer, ctx, 30, 10)
