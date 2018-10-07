@@ -19,14 +19,8 @@ def _get_batch(batch, ctx):
 
     if isinstance(ctx, mxnet.Context):
         ctx = [ctx]
-    features = []
-    labels = []
-    for feature, label in zip(batch[0],batch[1]):
-        f = load.load(feature)
-        if f:
-            features.append(f)
-            labels.append(label)
-
+    features,labels = batch
+    labels = labels.astype('float32')
     return (gutils.split_and_load(features, ctx),
 
             gutils.split_and_load(labels, ctx),
@@ -76,13 +70,11 @@ def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs
         train_l_sum, train_acc_sum, n, m = 0.0, 0.0, 0.0, 0.0
 
         start = time.time()
-        load_time = 0
         i = 0
         for batch in train_iter:
             i += 1
             t1 = time.time()
             Xs, ys, batch_size = _get_batch(batch, ctx)
-            load_time += time.time()-t1
             ls = []
 
             with autograd.record():
@@ -120,7 +112,6 @@ def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs
             epoch, train_l_sum / n, train_acc_sum / m, test_acc, time.time() - start
 
         ))
-        print ('load time', load_time)
         net.save_parameters('param')
         net.save_parameters("test_acc_%.3f_train_acc_%.3f-param" % (
 
@@ -138,6 +129,5 @@ scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
 trainer = gluon.Trainer(net.collect_params(), 'sgd',
                         {'learning_rate': 0.01, 'wd': 2e-4, 'lr_scheduler': scheduler, 'momentum': 0.9})
 train_data, test_data = load.loadpath()
-print(len(train_data),len(test_data))
 batch_size = 12
 train(train_data, test_data, batch_size, net, loss, trainer, ctx, 30, 10)
