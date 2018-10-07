@@ -8,9 +8,9 @@ import random
 import load
 import model
 
-
+GPU_NUM = 2
 def get_ctx():
-    ctx = mxnet.gpu()
+    ctx = [mxnet.gpu(i) for i in range(GPU_NUM)]
     return ctx
 
 
@@ -21,9 +21,9 @@ def _get_batch(batch, ctx):
         ctx = [ctx]
     features,labels = batch
     labels = labels.astype('float16')
-    return (gutils.split_and_load(features, ctx),
+    return (gutils.split_and_load(features, ctx, even_split=False),
 
-            gutils.split_and_load(labels, ctx),
+            gutils.split_and_load(labels, ctx, even_split=False),
 
             len(features))
     # return (features,labels,features.shape[0])
