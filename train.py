@@ -20,7 +20,7 @@ def _get_batch(batch, ctx):
     if isinstance(ctx, mxnet.Context):
         ctx = [ctx]
     features,labels = batch
-    labels = labels.astype('float32')
+    labels = labels.astype('float16')
     return (gutils.split_and_load(features, ctx),
 
             gutils.split_and_load(labels, ctx),
@@ -35,7 +35,7 @@ def evaluate_accuracy(data_iter, net, ctx=[mxnet.cpu()]):
     if isinstance(ctx, mxnet.Context):
         ctx = [ctx]
 
-    acc = ndarray.array([0])
+    acc = ndarray.array([0],dtype='float16')
 
     n = 0
 
@@ -44,7 +44,7 @@ def evaluate_accuracy(data_iter, net, ctx=[mxnet.cpu()]):
         features, labels, batch_size = _get_batch(batch, ctx)
 
         for X, y in zip(features, labels):
-            y = y.astype('float32')
+            y = y.astype('float16')
 
             acc += (net(X).argmax(axis=1) == y).sum().copyto(mxnet.cpu())
 
@@ -124,10 +124,15 @@ if os.path.exists('param'):
     net.load_parameters('param', ctx=ctx)
 else:
     net.initialize(force_reinit=True, init=init.Xavier(), ctx=ctx)
+net.cast(dtype='float16')
 loss = gluon.loss.SoftmaxCrossEntropyLoss()
 scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
 trainer = gluon.Trainer(net.collect_params(), 'sgd',
-                        {'learning_rate': 0.01, 'wd': 2e-4, 'lr_scheduler': scheduler, 'momentum': 0.9})
+                        {'learning_rate': 0.01,
+                         'wd': 2e-4,
+                         'lr_scheduler': scheduler,
+                         'momentum': 0.9,
+                         'multi_precision': True})
 train_data, test_data = load.loadpath()
-batch_size = 12
+batch_size = 30
 train(train_data, test_data, batch_size, net, loss, trainer, ctx, 30, 10)

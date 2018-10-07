@@ -36,8 +36,8 @@ class Dataset(object):
         self.dataset = dataset
     def __getitem__(self, i):
         path = self.dataset[i][0]
-        data = mxnet.ndarray.array(load(path))
-        return data,self.dataset[i][1]
+        data = mxnet.ndarray.array(load(path),dtype='float16')
+        return data, self.dataset[i][1]
     def __len__(self):
         return len(self.dataset)
 

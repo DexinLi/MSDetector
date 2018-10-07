@@ -29,7 +29,7 @@ class Payload(nn.HybridBlock):
 
 def get_netD():
     netD = nn.Sequential()
-    netD.add(nn.Embedding(257, 8),
+    netD.add(nn.Embedding(257, 8, dtype='float16'),
              GLU(channels=128, kernel_size=512, stride=512),
              nn.MaxPool1D(128, 128),
              nn.Dense(128),
