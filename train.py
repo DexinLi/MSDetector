@@ -7,6 +7,11 @@ import numpy
 import random
 import load
 import model
+import sys
+
+batch_mode = True
+if len(sys.argv) > 1:
+    batch_mode = False
 
 GPU_NUM = 2
 def get_ctx():
@@ -55,17 +60,17 @@ def evaluate_accuracy(data_iter, net, ctx=[mxnet.cpu()]):
     return acc.asscalar() / n
 
 
-def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs, print_batches=None):
+def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs, print_batches=None, is_batch=True):
     """Train and evaluate a model."""
 
     print("training on", ctx)
 
     if isinstance(ctx, mxnet.Context):
         ctx = [ctx]
-    test_iter = load.get_iter(test_data, batch_size)
+    test_iter = load.get_iter(test_data, batch_size, shuffle=False)
     for epoch in range(1, num_epochs + 1):
-        random.shuffle(train_data)
-        train_iter = load.get_iter(train_data, batch_size)
+
+        train_iter = load.get_iter(train_data, batch_size, shuffle=is_batch)
 
         train_l_sum, train_acc_sum, n, m = 0.0, 0.0, 0.0, 0.0
 
@@ -120,19 +125,31 @@ def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs
 
 net = model.get_netD()
 ctx = get_ctx()
+net.initialize(force_reinit=True, init=init.Xavier(), ctx=ctx)
+net.cast("float16")
 if os.path.exists('param'):
     net.load_parameters('param', ctx=ctx)
-else:
-    net.initialize(force_reinit=True, init=init.Xavier(), ctx=ctx)
-net.cast(dtype='float16')
+
 loss = gluon.loss.SoftmaxCrossEntropyLoss()
-scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
-trainer = gluon.Trainer(net.collect_params(), 'sgd',
-                        {'learning_rate': 0.01,
-                         'wd': 2e-4,
-                         'lr_scheduler': scheduler,
-                         'momentum': 0.9,
-                         'multi_precision': True})
-train_data, test_data = load.loadpath()
 batch_size = 30
-train(train_data, test_data, batch_size, net, loss, trainer, ctx, 30, 10)
+test_data = load.loadtest()
+if batch_mode:
+    scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.99)
+    trainer = gluon.Trainer(net.collect_params(), 'sgd',
+                            {'learning_rate': 0.01,
+                            'wd': 2e-4,
+                            'lr_scheduler': scheduler,
+                            'momentum': 0.9,
+                            'multi_precision': True})
+    train_data = load.loadbatch()
+
+    train(train_data, test_data, batch_size, net, loss, trainer, ctx, 10, 10)
+else:
+    trainer = gluon.Trainer(net.collect_params(), 'sgd',
+                            {'learning_rate': 0.008,
+                            'wd': 2e-4,
+                            'momentum': 0.9,
+                            'multi_precision': True})
+    train_data = load.loadinc()
+
+    train(train_data, test_data, batch_size, net, loss, trainer, ctx, 1, 10, False)
