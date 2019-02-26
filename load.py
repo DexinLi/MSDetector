@@ -2,6 +2,7 @@ import os
 import torch
 from torch.utils.data import DataLoader
 import time
+import numpy
 
 from multiprocessing import cpu_count
 CPU_COUNT = cpu_count()
@@ -9,7 +10,7 @@ fileLimit = 4*1024*1024
 SPLIT = 5
 
 def load(path):
-    res = [257]*fileLimit
+    res = numpy.full(fileLimit, 257)
     i = 0
     with open(path, 'r') as f:
         for line in f.readlines():
@@ -81,7 +82,9 @@ class Dataset(object):
     def __getitem__(self, i):
         path = self.dataset[i][0]
         data = load(path)
-        return data, self.dataset[i][1]
+        label = torch.full([10], 0,dtype=torch.long)
+        label[self.dataset[i][1]] = 1
+        return data, label
     def __len__(self):
         return len(self.dataset)
 
