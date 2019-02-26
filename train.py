@@ -133,23 +133,13 @@ if os.path.exists('param'):
 loss = gluon.loss.SoftmaxCrossEntropyLoss()
 batch_size = 30
 
-if batch_mode:
-    scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
-    trainer = gluon.Trainer(net.collect_params(), 'sgd',
-                            {'learning_rate': 0.01,
-                            'wd': 2e-4,
-                            'lr_scheduler': scheduler,
-                            'momentum': 0.9,
-                            'multi_precision': True})
-    train_data = load.loadbatch()
-    test_data = load.batch_test()
-    train(train_data, test_data, batch_size, net, loss, trainer, ctx, 10, 10)
-else:
-    trainer = gluon.Trainer(net.collect_params(), 'sgd',
-                            {'learning_rate': 0.008,
-                            'wd': 2e-4,
-                            'momentum': 0.9,
-                            'multi_precision': True})
-    train_data = load.loadinc()
-    test_data = load.inc_test()
-    train(train_data, test_data, batch_size, net, loss, trainer, ctx, 1, 10, False)
+scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
+trainer = gluon.Trainer(net.collect_params(), 'sgd',
+                        {'learning_rate': 0.01,
+                        'wd': 2e-4,
+                        'lr_scheduler': scheduler,
+                        'momentum': 0.9,
+                        'multi_precision': True})
+train_data = load.load_bench()
+test_data = load.load_bench()
+train(train_data, test_data, batch_size, net, loss, trainer, ctx, 3, 10)

@@ -4,12 +4,14 @@ from struct import unpack
 import time
 
 from multiprocessing import cpu_count
+
 CPU_COUNT = cpu_count()
-fileLimit = 4*1024*1024
+fileLimit = 4 * 1024 * 1024
 SPLIT = 5
 
+
 def load(path):
-    res = [257]*fileLimit
+    res = [257] * fileLimit
     i = 0
     with open(path, 'r') as f:
         for line in f.readlines():
@@ -20,11 +22,13 @@ def load(path):
                     res[i] = (int(s, 16))
                 else:
                     res[i] = 256
-                i+=1
+                i += 1
     return res
+
 
 def isTest(idx):
     return idx % 5 == 0
+
 
 def loadbatch():
     train = []
@@ -33,12 +37,13 @@ def loadbatch():
             line = line.split(',')
             name = line[0]
             label = int(line[1])
-            name = '../train/'+name+'.bytes'
+            name = '../train/' + name + '.bytes'
             if label > SPLIT:
                 break
             if not isTest(idx):
-                train.append((name,label))
+                train.append((name, label))
     return train
+
 
 def batch_test():
     test = []
@@ -47,10 +52,11 @@ def batch_test():
             line = line.split(',')
             name = line[0]
             label = int(line[1])
-            name = '../train/'+name+'.bytes'
+            name = '../train/' + name + '.bytes'
             if idx <= SPLIT and isTest(idx):
-                test.append((name,label))
+                test.append((name, label))
     return test
+
 
 def inc_test():
     test = []
@@ -64,6 +70,7 @@ def inc_test():
                 test.append((name, label))
     return test
 
+
 def loadinc():
     train = []
     with open('2.txt') as f:
@@ -71,26 +78,60 @@ def loadinc():
             line = line.split(',')
             name = line[0]
             label = int(line[1])
-            name = '../train/'+name+'.bytes'
+            name = '../train/' + name + '.bytes'
             if label <= SPLIT:
                 continue
             if not isTest(idx):
                 train.append((name, label))
     return train
 
+def load_bench():
+    res = []
+    with open("bench.txt") as f:
+        for idx, line in enumerate(f.readlines()):
+            line = line.split(',')
+            name = line[0]
+            label = int(line[1])
+            name = './train/' + name + '.bytes'
+            res.append((name, label))
+    return res
+
+def move():
+    from shutil import copyfile
+    files = {}
+    bench = []
+    with open('2.txt') as f:
+        for line in f:
+            line = line.split(',')
+            name = line[0]
+            label = int(line[1])
+            files.setdefault(label, []).append(name)
+    for k, v in files.items():
+        for name in v[:10]:
+            src = '../train/' + name + '.bytes'
+            dest = "./train/" + name + '.bytes'
+            copyfile(src, dest)
+            line = name + "," + str(k)
+            bench.append(line)
+    with open("bench.txt", "w") as f:
+        for line in bench:
+            f.write(line + "\n")
 
 
 class Dataset(object):
     def __init__(self, dataset):
         self.dataset = dataset
+
     def __getitem__(self, i):
         path = self.dataset[i][0]
-        data = mxnet.ndarray.array(load(path),dtype='float16')
+        data = mxnet.ndarray.array(load(path), dtype='float16')
         return data, self.dataset[i][1]
+
     def __len__(self):
         return len(self.dataset)
 
+
 def get_iter(dataset, batch_size, shuffle=True):
     d_set = Dataset(dataset)
-    dataloader = mxnet.gluon.data.DataLoader(d_set,shuffle=shuffle, batch_size=batch_size,num_workers=CPU_COUNT)
+    dataloader = mxnet.gluon.data.DataLoader(d_set, shuffle=shuffle, batch_size=batch_size, num_workers=CPU_COUNT)
     return dataloader
