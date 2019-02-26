@@ -1,8 +1,7 @@
-from mxnet.gluon import nn, utils as gutils
-from mxnet import gluon, init, ndarray, autograd
-import mxnet
 import time
 import os
+import torch
+from torch import nn, optim
 import numpy
 import random
 import load
@@ -13,60 +12,29 @@ batch_mode = True
 if len(sys.argv) > 1:
     batch_mode = False
 
-GPU_NUM = 2
-def get_ctx():
-    ctx = [mxnet.gpu(i) for i in range(GPU_NUM)]
-    return ctx
+device = torch.device("cuda:0")
 
 
-def _get_batch(batch, ctx):
-    """return features and labels on ctx"""
-
-    if isinstance(ctx, mxnet.Context):
-        ctx = [ctx]
-    features,labels = batch
-    labels = labels.astype('float16')
-    return (gutils.split_and_load(features, ctx, even_split=False),
-
-            gutils.split_and_load(labels, ctx, even_split=False),
-
-            len(features))
-    # return (features,labels,features.shape[0])
-
-
-def evaluate_accuracy(data_iter, net, ctx=[mxnet.cpu()]):
+def evaluate_accuracy(data_iter, net):
     """Evaluate accuracy of a model on the given data set."""
 
-    if isinstance(ctx, mxnet.Context):
-        ctx = [ctx]
-
-    acc = ndarray.array([0],dtype='float16')
+    acc = 0
 
     n = 0
-
-    for batch in data_iter:
-
-        features, labels, batch_size = _get_batch(batch, ctx)
-
-        for X, y in zip(features, labels):
-            y = y.astype('float16')
-
-            acc += (net(X).argmax(axis=1) == y).sum().copyto(mxnet.cpu())
-
-            n += y.size
-
-        acc.wait_to_read()
-
-    return acc.asscalar() / n
+    with torch.no_grad():
+        for features, labels in data_iter:
+            features = features.to(device)
+            labels = labels.to(device)
+            output = net(features)
+            _, ys = torch.max(output.data, 1)
+            n += labels.size(0)
+            acc += (ys == labels).sum().item()
+    return acc / n
 
 
-def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs, print_batches=None, is_batch=True):
+def train(train_data, test_data, batch_size, net, loss, trainer, num_epochs, print_batches=None, is_batch=True):
     """Train and evaluate a model."""
 
-    print("training on", ctx)
-
-    if isinstance(ctx, mxnet.Context):
-        ctx = [ctx]
     test_iter = load.get_iter(test_data, batch_size, shuffle=False)
     for epoch in range(1, num_epochs + 1):
 
@@ -76,32 +44,26 @@ def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs
 
         start = time.time()
         i = 0
-        for batch in train_iter:
+        for Xs, ys in train_iter:
             i += 1
             t1 = time.time()
-            Xs, ys, batch_size = _get_batch(batch, ctx)
-            ls = []
+            Xs = Xs.to(device)
+            ys = ys.to(device)
+            y_hats = net(Xs)
 
-            with autograd.record():
+            ls = loss(y_hats, ys)
 
-                y_hats = [net(X) for X in Xs]
+            ls.backward()
 
-                ls = [loss(y_hat, y) for y_hat, y in zip(y_hats, ys)]
+            train_acc_sum += (torch.max(y_hats, 1) == ys).sum().item()
 
-            for l in ls:
-                l.backward()
+            train_l_sum += ls.sum().item()
 
-            train_acc_sum += sum([(y_hat.argmax(axis=1) == y).sum().asscalar()
-
-                                  for y_hat, y in zip(y_hats, ys)])
-
-            train_l_sum += sum([l.sum().asscalar() for l in ls])
-
-            trainer.step(batch_size)
+            trainer.step()
 
             n += batch_size
 
-            m += sum([y.size for y in ys])
+            m += batch_size
 
             if print_batches and (i + 1) % print_batches == 0:
                 print("batch %d, loss %f, train acc %f, %ss per batch" % (
@@ -110,46 +72,36 @@ def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs
 
                 ))
         tt = time.time()
-        test_acc = evaluate_accuracy(test_iter, net, ctx)
-        print('test_time',time.time()-tt)
+        test_acc = evaluate_accuracy(test_iter, net)
+        print('test_time', time.time() - tt)
         print("epoch %d, loss %.4f, train acc %.3f, test acc %.3f, time %.1f sec" % (
 
             epoch, train_l_sum / n, train_acc_sum / m, test_acc, time.time() - start
 
         ))
-        net.save_parameters('param')
-        net.save_parameters("test_acc_%.3f_train_acc_%.3f-param" % (
+        torch.save(net.state_dict(), 'param.pt')
+        torch.save(net.state_dict(), "test_acc_%.3f_train_acc_%.3f-param.pt" % (
 
             test_acc, train_acc_sum / m))
 
 
-net = model.get_netD()
-ctx = get_ctx()
-net.initialize(force_reinit=True, init=init.Xavier(), ctx=ctx)
-net.cast("float16")
-if os.path.exists('param'):
-    net.load_parameters('param', ctx=ctx)
+net = model.Malconv()
+if os.path.exists("param.pt"):
+    net.load_state_dict(torch.load("param.pt"))
 
-loss = gluon.loss.SoftmaxCrossEntropyLoss()
+net = nn.DataParallel(net)
+net.to(device)
+
+loss = nn.CrossEntropyLoss()
 batch_size = 30
 test_data = load.loadtest()
 if batch_mode:
-    scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
-    trainer = gluon.Trainer(net.collect_params(), 'sgd',
-                            {'learning_rate': 0.01,
-                            'wd': 2e-4,
-                            'lr_scheduler': scheduler,
-                            'momentum': 0.9,
-                            'multi_precision': True})
+    trainer = optim.SGD(net.parameters(), lr=0.005, momentum=0.9, weight_decay=2e-4)
     train_data = load.loadbatch()
 
-    train(train_data, test_data, batch_size, net, loss, trainer, ctx, 10, 10)
+    train(train_data, test_data, batch_size, net, loss, trainer, 10, 10)
 else:
-    trainer = gluon.Trainer(net.collect_params(), 'sgd',
-                            {'learning_rate': 0.008,
-                            'wd': 2e-4,
-                            'momentum': 0.9,
-                            'multi_precision': True})
+    trainer = optim.SGD(net.parameters(), lr=0.008, momentum=0.9, weight_decay=2e-4)
     train_data = load.loadinc()
 
-    train(train_data, test_data, batch_size, net, loss, trainer, ctx, 1, 10, False)
+    train(train_data, test_data, batch_size, net, loss, trainer, 1, 10, False)

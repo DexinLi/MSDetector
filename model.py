@@ -1,69 +1,28 @@
-from mxnet.gluon import nn
-import mxnet
+from torch import nn
+import torch
 
+class Malconv(nn.Module):
+    def __init__(self):
+        super(Malconv, self).__init__()
+        self.embed = nn.Embedding(258, 8)
+        self.conv = nn.Conv1d(8, 128, kernel_size=512, stride=512)
+        self.glu = nn.GLU()
+        self.pooling = nn.MaxPool1d(64, 64)
+        self.fc = nn.Linear(8192, 128)
+        self.sig = nn.Sigmoid()
+        self.out = nn.Linear(128, 10)
+        self.softmax = nn.Softmax()
 
-class GLU(nn.HybridBlock):
-    def __init__(self, channels, kernel_size, stride):
-        super(GLU, self).__init__()
-        self.conv = nn.Conv1D(channels, kernel_size, stride)
-        self.channels = channels
-
-    def hybrid_forward(self, F, X, *args, **kwargs):
-        X = X.transpose((0, 2, 1))
-        X = self.conv(X)
-        channels = self.channels // 2
-        Y1 = mxnet.nd.slice_axis(X, axis=1, begin=0, end=channels)
-        Y2 = mxnet.nd.slice_axis(X, axis=1, begin=channels, end=self.channels)
-        Z = mxnet.nd.multiply(Y1, mxnet.nd.sigmoid(Y2))
-        Z = Z.transpose((0, 2, 1))
-        return Z.reshape((0, 1, -1))
-
-
-class Payload(nn.HybridBlock):
-    def __init__(self, ctx):
-        super(Payload, self).__init__()
-        self.layer = mxnet.nd.random_uniform(0, 255, 1024 * 1024, ctx)
-
-    def hybrid_forward(self, F, x, *args, **kwargs):
-        y = x + self.layer
-        return y.clip(0, 256)
-
-
-def get_netD():
-    netD = nn.Sequential()
-    netD.add(nn.Embedding(258, 8, dtype='float16'),
-             GLU(channels=128, kernel_size=512, stride=512),
-             nn.MaxPool1D(128, 128),
-             nn.Dense(128),
-             nn.Dense(10))
-    return netD
-
-
-def get_netD1():
-    netD = nn.Sequential()
-    netD.add(nn.Conv1D(channels=8, kernel_size=4, strides=1, activation='relu'),
-             nn.MaxPool1D(pool_size=4, strides=1),
-             nn.Conv1D(channels=128, kernel_size=512, strides=512, activation='relu'),
-             nn.MaxPool1D(pool_size=4, strides=4),
-             nn.Conv1D(channels=256, kernel_size=4, strides=4, activation='relu'),
-             nn.MaxPool1D(pool_size=4, strides=4),
-             nn.Dense(128),
-             nn.Dense(10))
-    return netD
-
-
-def get_netG():
-    netG = nn.Sequential()
-    netG.add(nn.Embedding(256, 8),
-             GLU(channels=128, kernel_size=512, stride=512),
-             nn.MaxPool1D(128, 128),
-             nn.Dense(1024))
-    return netG
-
-
-def get_netG1(ctx):
-    netG = nn.Sequential()
-    netG.add(
-        Payload(ctx)
-    )
-    return netG
+    def forward(self, x):
+        x = self.embed(x)
+        x = torch.transpose(x, -1, -2)
+        x = self.conv(x)
+        x = self.glu(x)
+        x = torch.transpose(x, -1, -2)
+        x = torch.Tensor()
+        x = x.view((x.shape[0], 1, -1))
+        x = self.pooling(x)
+        x = self.fc(x)
+        x = self.sig(x)
+        x = self.out(x)
+        return self.softmax(x)
