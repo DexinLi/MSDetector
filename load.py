@@ -40,7 +40,7 @@ def loadbatch():
                 train.append((name,label))
     return train
 
-def loadtest():
+def batch_test():
     test = []
     with open('2.txt') as f:
         for idx, line in enumerate(f.readlines()):
@@ -48,8 +48,20 @@ def loadtest():
             name = line[0]
             label = int(line[1])
             name = '../train/'+name+'.bytes'
-            if isTest(idx):
+            if idx <= SPLIT and isTest(idx):
                 test.append((name,label))
+    return test
+
+def inc_test():
+    test = []
+    with open('2.txt') as f:
+        for idx, line in enumerate(f.readlines()):
+            line = line.split(',')
+            name = line[0]
+            label = int(line[1])
+            name = '../train/' + name + '.bytes'
+            if isTest(idx):
+                test.append((name, label))
     return test
 
 def loadinc():
