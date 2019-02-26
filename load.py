@@ -1,7 +1,6 @@
 import os
 import mxnet
-from struct import unpack
-import time
+import numpy
 
 from multiprocessing import cpu_count
 CPU_COUNT = cpu_count()
@@ -9,7 +8,7 @@ fileLimit = 4*1024*1024
 SPLIT = 5
 
 def load(path):
-    res = [257]*fileLimit
+    res = numpy.full(fileLimit, 257)
     i = 0
     with open(path, 'r') as f:
         for line in f.readlines():
@@ -40,7 +39,7 @@ def loadbatch():
                 train.append((name,label))
     return train
 
-def loadtest():
+def batch_test():
     test = []
     with open('2.txt') as f:
         for idx, line in enumerate(f.readlines()):
@@ -48,8 +47,20 @@ def loadtest():
             name = line[0]
             label = int(line[1])
             name = '../train/'+name+'.bytes'
-            if isTest(idx):
+            if label <= SPLIT and isTest(idx):
                 test.append((name,label))
+    return test
+
+def inc_test():
+    test = []
+    with open('2.txt') as f:
+        for idx, line in enumerate(f.readlines()):
+            line = line.split(',')
+            name = line[0]
+            label = int(line[1])
+            name = '../train/' + name + '.bytes'
+            if isTest(idx):
+                test.append((name, label))
     return test
 
 def loadinc():

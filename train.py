@@ -104,9 +104,9 @@ def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs
             m += sum([y.size for y in ys])
 
             if print_batches and (i + 1) % print_batches == 0:
-                print("batch %d, loss %f, train acc %f" % (
+                print("batch %d, loss %f, train acc %f, %.2fs per batch" % (
 
-                    n, train_l_sum / n, train_acc_sum / m
+                    n, train_l_sum / n, train_acc_sum / m, time.time() - t1
 
                 ))
         tt = time.time()
@@ -131,10 +131,10 @@ if os.path.exists('param'):
     net.load_parameters('param', ctx=ctx)
 
 loss = gluon.loss.SoftmaxCrossEntropyLoss()
-batch_size = 30
-test_data = load.loadtest()
+batch_size = 16 * GPU_NUM
+
 if batch_mode:
-    scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.99)
+    scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
     trainer = gluon.Trainer(net.collect_params(), 'sgd',
                             {'learning_rate': 0.01,
                             'wd': 2e-4,
@@ -142,7 +142,7 @@ if batch_mode:
                             'momentum': 0.9,
                             'multi_precision': True})
     train_data = load.loadbatch()
-
+    test_data = load.batch_test()
     train(train_data, test_data, batch_size, net, loss, trainer, ctx, 10, 10)
 else:
     trainer = gluon.Trainer(net.collect_params(), 'sgd',
@@ -151,5 +151,5 @@ else:
                             'momentum': 0.9,
                             'multi_precision': True})
     train_data = load.loadinc()
-
+    test_data = load.inc_test()
     train(train_data, test_data, batch_size, net, loss, trainer, ctx, 1, 10, False)
