@@ -5,16 +5,18 @@ import mxnet
 class GLU(nn.HybridBlock):
     def __init__(self, channels, kernel_size, stride):
         super(GLU, self).__init__()
-        self.conv1 = nn.Conv1D(channels, kernel_size, stride)
-        self.conv2 = nn.Conv1D(channels, kernel_size, stride)
+        self.conv = nn.Conv1D(channels, kernel_size, stride)
+        self.channels = channels
 
     def hybrid_forward(self, F, X, *args, **kwargs):
         X = X.transpose((0, 2, 1))
-        Y1 = self.conv1(X)
-        Y2 = self.conv2(X)
+        X = self.conv(X)
+        channels = self.channels // 2
+        Y1 = mxnet.nd.slice_axis(X, axis=1, begin=0, end=channels)
+        Y2 = mxnet.nd.slice_axis(X, axis=1, begin=channels, end=self.channels)
         Z = mxnet.nd.multiply(Y1, mxnet.nd.sigmoid(Y2))
         Z = Z.transpose((0, 2, 1))
-        return Z.reshape((Z.shape[0], 1, -1))
+        return Z.reshape((0, 1, -1))
 
 
 class Payload(nn.HybridBlock):
@@ -29,7 +31,7 @@ class Payload(nn.HybridBlock):
 
 def get_netD():
     netD = nn.Sequential()
-    netD.add(nn.Embedding(257, 8, dtype='float16'),
+    netD.add(nn.Embedding(258, 8, dtype='float16'),
              GLU(channels=128, kernel_size=512, stride=512),
              nn.MaxPool1D(128, 128),
              nn.Dense(128),

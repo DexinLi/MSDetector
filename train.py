@@ -104,9 +104,9 @@ def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs
             m += sum([y.size for y in ys])
 
             if print_batches and (i + 1) % print_batches == 0:
-                print("batch %d, loss %f, train acc %f" % (
+                print("batch %d, loss %f, train acc %f, %ss per batch" % (
 
-                    n, train_l_sum / n, train_acc_sum / m
+                    n, train_l_sum / n, train_acc_sum / m, time.time() - t1
 
                 ))
         tt = time.time()
@@ -134,7 +134,7 @@ loss = gluon.loss.SoftmaxCrossEntropyLoss()
 batch_size = 30
 test_data = load.loadtest()
 if batch_mode:
-    scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.99)
+    scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
     trainer = gluon.Trainer(net.collect_params(), 'sgd',
                             {'learning_rate': 0.01,
                             'wd': 2e-4,
