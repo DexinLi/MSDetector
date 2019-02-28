@@ -127,6 +127,7 @@ net = model.get_netD()
 ctx = get_ctx()
 net.initialize(force_reinit=True, init=init.Xavier(), ctx=ctx)
 net.cast("float16")
+net.hybridize()
 if os.path.exists('param'):
     net.load_parameters('param', ctx=ctx)
 
