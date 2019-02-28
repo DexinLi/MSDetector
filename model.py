@@ -21,8 +21,8 @@ class GLU(nn.HybridBlock):
 
 def get_netD():
     netD = nn.Sequential()
-    netD.add(nn.Embedding(258, 8, dtype='float16'),
-             GLU(channels=128, kernel_size=512, stride=512),
+    netD.add(nn.Embedding(128, 7, dtype='float16'),
+             GLU(channels=128, kernel_size=64, stride=64),
              nn.MaxPool1D(64, 64),
              nn.Dense(128, activation="sigmoid"),
              nn.Dense(10))

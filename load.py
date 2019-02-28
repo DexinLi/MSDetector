@@ -1,26 +1,18 @@
 import os
 import mxnet
-import numpy
+import pickle
 
 from multiprocessing import cpu_count
 CPU_COUNT = cpu_count()
-fileLimit = 4*1024*1024
+fileLimit = 512*1024
 SPLIT = 5
 
 def load(path):
-    res = numpy.full(fileLimit, 257)
+    res = []
     i = 0
-    with open(path, 'r') as f:
-        for line in f.readlines():
-            for idx, s in enumerate(line.split()):
-                if idx == 0:
-                    continue
-                if s != '??':
-                    res[i] = (int(s, 16))
-                else:
-                    res[i] = 256
-                i+=1
-    return res
+    with open(path, 'rb') as f:
+        res = pickle.load(f)
+    return res + (fileLimit - len(res)) * [127]
 
 def isTest(idx):
     return idx % 5 == 0
@@ -32,7 +24,7 @@ def loadbatch():
             line = line.split(',')
             name = line[0]
             label = int(line[1])
-            name = '../train/'+name+'.bytes'
+            name = './op/'+name+'.pickle'
             if label > SPLIT:
                 break
             if not isTest(idx):
@@ -46,7 +38,7 @@ def batch_test():
             line = line.split(',')
             name = line[0]
             label = int(line[1])
-            name = '../train/'+name+'.bytes'
+            name = './op/'+name+'.pickle'
             if label <= SPLIT and isTest(idx):
                 test.append((name,label))
     return test
@@ -58,7 +50,7 @@ def inc_test():
             line = line.split(',')
             name = line[0]
             label = int(line[1])
-            name = '../train/' + name + '.bytes'
+            name = './op/' + name + '.pickle'
             if isTest(idx):
                 test.append((name, label))
     return test
@@ -70,7 +62,7 @@ def loadinc():
             line = line.split(',')
             name = line[0]
             label = int(line[1])
-            name = '../train/'+name+'.bytes'
+            name = './op/'+name+'.pickle'
             if label <= SPLIT:
                 continue
             if not isTest(idx):
