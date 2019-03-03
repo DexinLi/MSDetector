@@ -47,6 +47,24 @@ def get_netD0():
              nn.Dense(10))
     return netD
 
+class NetD2(nn.HybridBlock):
+    def __init__(self):
+        super(NetD2, self).__init__()
+        self.emb = nn.Embedding(128, 7, dtype='float16')
+        self.conv = nn.Conv1D(channels=32, kernel_size=4)
+        self.liner = nn.Dense(128, activation='relu')
+        self.output = nn.Dense(10)
+    def hybrid_forward(self, F, X, *args, **kwargs):
+        X = self.emb(X)
+        X = X.transpose((0, 2, 1))
+        X = self.conv(X)
+        X = self.liner(X)
+        return self.output(X)
+
+def get_netD2():
+    return NetD2()
+
+
 def get_netD1():
     netD = nn.Sequential()
     netD.add(nn.Conv1D(channels=8, kernel_size=4, strides=1, activation='relu'),

@@ -13,9 +13,8 @@ batch_mode = True
 if len(sys.argv) > 1:
     batch_mode = False
 
-GPU_NUM = 2
 def get_ctx():
-    ctx = [mxnet.gpu(i) for i in range(GPU_NUM)]
+    ctx = [mxnet.gpu(i) for i in mxnet.test_utils.list_gpus()]
     return ctx
 
 
@@ -123,7 +122,7 @@ def train(train_data, test_data, batch_size, net, loss, trainer, ctx, num_epochs
             test_acc, train_acc_sum / m))
 
 
-net = model.get_netD()
+net = model.get_netD2()
 ctx = get_ctx()
 net.initialize(force_reinit=True, init=init.Xavier(), ctx=ctx)
 net.cast("float16")
@@ -132,7 +131,7 @@ if os.path.exists('param'):
     net.load_parameters('param', ctx=ctx)
 
 loss = gluon.loss.SoftmaxCrossEntropyLoss()
-batch_size = 16 * GPU_NUM
+batch_size = 32
 
 if batch_mode:
     scheduler = mxnet.lr_scheduler.FactorScheduler(100, 0.9)
